@@ -5,29 +5,37 @@ import com.google.android.gms.maps.model.LatLng;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.security.Timestamp;
-import java.util.UUID;
 
 /**
  * Created by lee0nerd0 on 9/26/2016.
  */
 
 public class Mate {
-    private UUID id;
+    private String id;
     private String userName;
     private String password;
     private String groupName;
     private Integer iconid;
     private LatLng latLng;
-    private Timestamp timestamp;
+    private String timestamp;
+
+    Mate (String id, String uN, String pw, String gN, Integer i, LatLng loc, String ts) {
+        setId(id);
+        setUserName(uN);
+        setPassword(pw);
+        setGroupName(gN);
+        setIconid(i);
+        setLatLng(loc);
+        setTimestamp(ts);
+    }
 
     // getters and setters
 
-    public UUID getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(UUID id) {
+    public void setId(String id) {
         this.id = id;
     }
 
@@ -71,26 +79,27 @@ public class Mate {
         this.latLng = latLng;
     }
 
-    public Timestamp getTimestamp() {
+    public String getTimestamp() {
         return timestamp;
     }
 
-    public void setTimestamp(Timestamp timestamp) {
+    public void setTimestamp(String timestamp) {
         this.timestamp = timestamp;
     }
 
-    public static String toJSON(Mate mate) {
+    public String toJSON() {
 
         try {
 
             JSONObject jsonObject = new JSONObject();
-            jsonObject.put("id", mate.getId());
-            jsonObject.put("userName", mate.getUserName());
-            jsonObject.put("password", mate.getPassword());
-            jsonObject.put("groupName", mate.getGroupName());
-            jsonObject.put("iconid", mate.getIconid());
-            jsonObject.put("latlng", mate.getLatLng());
-            jsonObject.put("timestamp", mate.getTimestamp());
+            jsonObject.put("id", getId());
+            jsonObject.put("userName", getUserName());
+            jsonObject.put("password", getPassword());
+            jsonObject.put("groupName", getGroupName());
+            jsonObject.put("icon", getIconid());
+            jsonObject.put("lat", getLatLng().latitude);
+            jsonObject.put("lon", getLatLng().longitude);
+            jsonObject.put("timestamp", getTimestamp());
 
             return jsonObject.toString();
 

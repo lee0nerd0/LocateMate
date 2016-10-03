@@ -8,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.AsyncTask;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
@@ -19,6 +20,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.widget.Toast;
 
+import com.google.android.gms.ads.MobileAds;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -37,7 +39,10 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.Timestamp;
+import java.sql.Time;
 import java.util.HashMap;
+import java.util.UUID;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
 
@@ -45,8 +50,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     SharedRef sharedRef;
     int permissionCheck;
     static final int MY_LOCATION_REQUEST = 1;
-    private static final String GET_DATA_URL = "http://localhost:3000/get_data";
+    // android localhost is 10.0.2.2
+    private static final String GET_DATA_URL = "http://10.0.2.2:3000/get_data";
     private static final String SAVE_DATA_URL = "http://localhost:3000/save_data";
+    private Mate me = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -137,6 +144,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         MyLocationListener myLocationListener = new MyLocationListener(this);
         LocationManager locationManager = (LocationManager)getSystemService(LOCATION_SERVICE);
 
+        // TODO: Setting DEFAULT MATE, NEED TO MOVE SOMEWHERE ELSE
+        Long tsLong = System.currentTimeMillis()/1000;
+        String ts = tsLong.toString();
+        me = new Mate(Settings.Secure.ANDROID_ID, "#myname", "", "DefaultGroup", 0, myLocationListener.getLatlng(), ts);
+        //
+
         try {
 
             Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
@@ -185,27 +198,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-    private class JsonTask extends AsyncTask<String, String, JSONObject> {
+    private class JsonTask extends AsyncTask<String, JSONArray, JSONObject> {
 
         private ProgressDialog progressDialog;
-
-        private static final String TAG_SUCCESS = "success";
-        private static final String TAG_MESSAGE = "message";
 
         @Override
         protected void onPreExecute() {
             progressDialog = new ProgressDialog(MapsActivity.this);
-            progressDialog.setMessage("Attempting login...");
-            progressDialog.setIndeterminate(false);
-            progressDialog.setCancelable(true);
-            progressDialog.show();
+            progressDialog.show(MapsActivity.this,"JSON Task", "Working...", false, true);
         }
 
         @Override
         protected JSONObject doInBackground(String... args) {
 
             try {
-                String json;
+                JSONArray json;
 
                 URL url = new URL(args[0]);
 
@@ -218,10 +225,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 urlConnection.setConnectTimeout(7000);
 
                 try {
-                    InputStream in = new BufferedInputStream(urlConnection.getInputStream());
                     OutputStream out = new BufferedOutputStream(urlConnection.getOutputStream());
+                    out.write(me.toJSON().getBytes("UTF-8"));
+                    out.close();
 
-                    json = ConvertInputToString(in);
+                    InputStream in = new BufferedInputStream(urlConnection.getInputStream());
+                    json = ConvertInputToJsonArray(in);
 
                     publishProgress(json);
                 } finally {
@@ -231,45 +240,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 e.printStackTrace();
             }
 
-//            try {
-//                HashMap<String, String> params = new HashMap<>();
-//                params.put("id", args[0]);
-//                params.put("userName", args[1]);
-//                params.put("password", args[2]);
-//                params.put("groupName", args[3]);
-//                params.put("iconid", args[4]);
-//                params.put("lat", args[5]);
-//                params.put("lon", args[6]);
-//                params.put("timestamp", args[7]);
-//
-//                Log.d("request", "starting");
-//
-//                JSONObject json = jsonParser.makeHttpRequest(LOGIN_URL, "POST", params);
-//
-//                if (json != null){
-//                    Log.d("JSON result", json.toString());
-//
-//                    return json;
-//                }
-//            }catch (Exception e){
-//                e.printStackTrace();
-//            }
             return null;
         }
 
         @Override
-        protected void onProgressUpdate(String... values) {
+        protected void onProgressUpdate(JSONArray... values) {
             try {
-                // Parse the JSON??!!?!??
                 Mate mate;
-                JSONArray json = new JSONArray(values[0]);
-//                for (int i = 0 ; i < json.length() ; i++) {
-//                    mate = (Mate)json.get(i);
-//
-//                }
-                mate = (Mate)json.get(0);
-
-                Toast.makeText(getApplicationContext(), "GroupName: " + mate.getGroupName(), Toast.LENGTH_LONG).show();
+                JSONArray json = values[0];
+                Toast.makeText(MapsActivity.this, "onProgressUpdate", Toast.LENGTH_LONG).show();
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -283,26 +262,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             if (progressDialog != null && progressDialog.isShowing()){
                 progressDialog.dismiss();
             }
-
-            if (json != null){
-                Toast.makeText(MapsActivity.this, json.toString(), Toast.LENGTH_LONG).show();
-                try {
-                    success = json.getInt(TAG_SUCCESS);
-                    message = json.getString(TAG_MESSAGE);
-                }catch (Exception e){
-                    e.printStackTrace();
-                }
-            }
-
-            if (success == 1){
-                Log.d("Success!", message);
-            }else {
-                Log.d("Failure", message);
-            }
         }
     }
 
-    public static String ConvertInputToString(InputStream in){
+    public static JSONArray ConvertInputToJsonArray(InputStream in){
         BufferedReader breader = new BufferedReader(new InputStreamReader(in));
         String line;
         String result = "";
@@ -311,12 +274,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             while ((line = breader.readLine()) != null){
                 result += line;
             }
+
+            JSONArray json = new JSONArray(result);
+
             in.close();
+
+            return json;
+
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        return result;
+        return null;
+
     }
 
 }

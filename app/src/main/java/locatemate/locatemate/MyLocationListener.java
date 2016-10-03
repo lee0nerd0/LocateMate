@@ -6,6 +6,8 @@ import android.location.LocationListener;
 import android.os.Bundle;
 import android.widget.Toast;
 
+import com.google.android.gms.maps.model.LatLng;
+
 /**
  * Created by lee0nerd0 on 9/27/2016.
  */
@@ -17,6 +19,13 @@ public class MyLocationListener implements LocationListener {
 
     public MyLocationListener(Context context){
         this.context = context;
+    }
+
+    public LatLng getLatlng() {
+        if (location != null) {
+            return new LatLng(location.getLatitude(), location.getLongitude());
+        }
+        return null;
     }
 
     @Override
